@@ -1,16 +1,16 @@
 local redis = require "redis"
 local seri = require "seri"
-local connect_conf, merge_rule = require "merge_conf"
+local db_conf = require "db_conf"
 
-local source_db_client = redis.connect(connect_conf.source_db.ip, connect_conf.source_db.port)
-local destination_db_client = redis.connect(connect_conf.destination_db.ip, connect_conf.destination_db.port)
+local source_db_client = redis.connect(db_conf.source_db.ip, db_conf.source_db.port)
+local destination_db_client = redis.connect(db_conf.destination_db.ip, db_conf.destination_db.port)
 
 function auth_connection()
-    if connect_conf.source_db.auth then
-        source_db_client:auth(connect_conf.source_db.auth)
+    if db_conf.source_db.auth then
+        source_db_client:auth(db_conf.source_db.auth)
     end
-    if connect_conf.destination_db.auth then
-        destination_db_client:auth(connect_conf.destination_db.auth)
+    if db_conf.destination_db.auth then
+        destination_db_client:auth(db_conf.destination_db.auth)
     end
 
     assert(source_db_client:ping())
