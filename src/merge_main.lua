@@ -1,6 +1,8 @@
-local redis = require "redis"
-local seri = require "seri"
+local redis   = require "redis"
+local seri    = require "seri"
 local db_conf = require "db_conf"
+
+require "DB_KEY"
 
 local source_db_client = redis.connect(db_conf.source_db.ip, db_conf.source_db.port)
 local destination_db_client = redis.connect(db_conf.destination_db.ip, db_conf.destination_db.port)
@@ -18,9 +20,6 @@ function auth_connection()
 end
 
 --------------------------------------------------------------------------------
-
-local KEY_GAME_ID = "game_ID_"
-local KEY_GAME_SERVER = "game_server_"
 
 function fetch_pattern_key_list(pattern)
     local all_list = source_db_client:keys("*")
@@ -84,8 +83,6 @@ function merge_player_data()
     end
 end
 
-local DIAMOND_INVEST = "diamond_invest_global"
-
 function merge_server_data()
     local server_key_list = fetch_pattern_key_list(server_key_pattern())
 
@@ -96,7 +93,7 @@ function merge_server_data()
         for _, sub_system_key in pairs(sub_system_key_list) do
             local data_string = source_db_client:hget(hash_name, sub_system_key)
 
-            if sub_system_key == DIAMOND_INVEST then
+            if sub_system_key == KEY_DIAMOND_INVEST then
                 print(sub_system_key, data_string)
 
                 -- TODO
