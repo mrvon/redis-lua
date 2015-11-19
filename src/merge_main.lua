@@ -120,7 +120,11 @@ function merge_server_data(source_client_a, source_client_b, destination_client)
             local a_data_string = source_client_a:hget(a_server_key, sub_system_key)
             local b_data_string = source_client_b:hget(b_server_key, sub_system_key)
 
-            local c_data_string = seri.pack(handler(seri.unpack(a_data_string), seri.unpack(b_data_string)))
+            local c_data_string = seri.pack(
+                handler(
+                    a_data_string and seri.unpack(a_data_string), 
+                    b_data_string and seri.unpack(b_data_string)))
+
             destination_client:hset(c_server_key, sub_system_key, c_data_string)
         end
     end
