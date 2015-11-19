@@ -1,4 +1,4 @@
-local connect_conf = {
+local db_conf = {
     source_db = {
         ip = '127.0.0.1',
         port = 3001,
@@ -11,7 +11,4 @@ local connect_conf = {
     },
 }
 
-local merge_rule = {
-}
-
-return connect_conf, merge_rule
+return db_conf
