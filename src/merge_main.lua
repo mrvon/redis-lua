@@ -32,15 +32,23 @@ function fetch_pattern_key_list(db_client, pattern)
     return key_list
 end
 
+function aux_union_list(list, aux_list, ret_list)
+    for _, v in pairs(list) do
+        if not aux_list[v] then
+            aux_list[v] = true
+            table.insert(ret_list, v)
+        end
+    end
+end
+
 function union_list(list_x, list_y)
-    local list = {}
-    for k in pairs(list_x) do
-        list[k] = true
-    end
-    for k in pairs(list_y) do
-        list[k] = true
-    end
-    return list
+    local aux_list = {}
+    local ret_list = {}
+
+    aux_union_list(list_x, aux_list, ret_list)
+    aux_union_list(list_y, aux_list, ret_list)
+
+    return ret_list
 end
 
 function player_key_pattern()
@@ -56,6 +64,9 @@ assert(not string.match(KEY_GAME_ID .. "110", player_key_pattern()))
 assert(not string.match(KEY_GAME_ID .. "1_1p", player_key_pattern()))
 assert(not string.match("h" .. KEY_GAME_ID .. "1_1", player_key_pattern()))
 
+function server_key_build(server_id)
+    return KEY_GAME_SERVER .. server_id
+end
 
 function server_key_pattern(server_id)
     return string.format("^" .. KEY_GAME_SERVER .. "[%d]+" .. "$", server_id)
@@ -74,8 +85,13 @@ assert(not string.match("H" .. KEY_GAME_SERVER .. "1_1", server_key_pattern(1)))
 
 function get_server_key(db_client, server_id)
     local server_key_list = fetch_pattern_key_list(db_client, server_key_pattern(server_id))
-    assert(#server_key_list == 1)
-    return server_key_list[1]
+    if #server_key_list == 0 then
+        return nil
+    elseif #server_key_list == 1 then
+        return server_key_list[1]
+    else
+        assert(false, "Error: more than one server key")
+    end
 end
 
 function merge_player_data(source_client, destination_client)
@@ -104,13 +120,15 @@ function merge_player_data(source_client, destination_client)
 end
 
 function merge_server_data(source_client_a, source_client_b, destination_client)
-    local a_server_key = get_server_key(source_client_a, db_conf.source_client_a.server_id)
-    local b_server_key = get_server_key(source_client_b, db_conf.source_client_b.server_id)
-    local c_server_key = get_server_key(destination_client, db_conf.destination_db.server_id)
+    local a_server_key = get_server_key(source_client_a, db_conf.source_db_a.server_id)
+    local b_server_key = get_server_key(source_client_b, db_conf.source_db_b.server_id)
+    local c_server_key = server_key_build(db_conf.destination_db.server_id)
+
+    destination_client:del(c_server_key)
 
     local sub_system_key_list = union_list(
-        source_client_a:hkeys(a_server_key),
-        source_client_b:hkeys(b_server_key)
+        a_server_key and source_client_a:hkeys(a_server_key) or {},
+        b_server_key and source_client_b:hkeys(b_server_key) or {}
     )
 
     for _, sub_system_key in pairs(sub_system_key_list) do
@@ -128,7 +146,6 @@ function merge_server_data(source_client_a, source_client_b, destination_client)
             destination_client:hset(c_server_key, sub_system_key, c_data_string)
         end
     end
-
 end
 
 function main()

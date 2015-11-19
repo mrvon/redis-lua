@@ -15,7 +15,8 @@ local db_conf = {
 
     destination_db = {
         ip = '127.0.0.1',
-        port = 6379,
+        port = 3102,
+        auth = 'zhenlong',
         server_id = 3,
     },
 }
