@@ -98,8 +98,6 @@ function merge_server_data()
             local handler = merge_server_data_handler[sub_system_key]
             if handler then
                 local new_data_string = seri.pack(handler(seri.unpack(data_string)))
-                print(data_string)
-                print(new_data_string)
                 source_db_client:hset(hash_name, sub_system_key, new_data_string)
             end
         end
