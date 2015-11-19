@@ -2,6 +2,8 @@ local redis   = require "redis"
 local seri    = require "seri"
 local db_conf = require "db_conf"
 
+local merge_server_data_handler = require "merge_server_data_handler"
+
 require "DB_KEY"
 
 local source_db_client = redis.connect(db_conf.source_db.ip, db_conf.source_db.port)
@@ -93,17 +95,13 @@ function merge_server_data()
         for _, sub_system_key in pairs(sub_system_key_list) do
             local data_string = source_db_client:hget(hash_name, sub_system_key)
 
-            if sub_system_key == KEY_DIAMOND_INVEST then
-                print(sub_system_key, data_string)
-
-                -- TODO
-                local data_table = seri.unpack(data_string)
-                data_table.local_open_id = data_table.local_open_id + 1
-
-                local new_data_string = seri.pack(data_table)
+            local handler = merge_server_data_handler[sub_system_key]
+            if handler then
+                local new_data_string = seri.pack(handler(seri.unpack(data_string)))
+                print(data_string)
+                print(new_data_string)
                 source_db_client:hset(hash_name, sub_system_key, new_data_string)
             end
-
         end
 
     end
