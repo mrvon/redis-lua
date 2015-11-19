@@ -7,7 +7,7 @@ local merge_server_data_handler = require "merge_server_data_handler"
 require "DB_KEY"
 
 
-function connect_db()
+function connect_db(conf)
     local db_client = redis.connect(conf.ip, conf.port)
 
     if conf.auth then
@@ -32,7 +32,15 @@ function fetch_pattern_key_list(db_client, pattern)
     return key_list
 end
 
-function union_list()
+function union_list(list_x, list_y)
+    local list = {}
+    for k in pairs(list_x) do
+        list[k] = true
+    end
+    for k in pairs(list_y) do
+        list[k] = true
+    end
+    return list
 end
 
 function player_key_pattern()
@@ -49,21 +57,26 @@ assert(not string.match(KEY_GAME_ID .. "1_1p", player_key_pattern()))
 assert(not string.match("h" .. KEY_GAME_ID .. "1_1", player_key_pattern()))
 
 
-function server_key_pattern()
-    return "^" .. KEY_GAME_SERVER .. "[%d]+" .. "$"
+function server_key_pattern(server_id)
+    return string.format("^" .. KEY_GAME_SERVER .. "[%d]+" .. "$", server_id)
 end
 
-assert(    string.match(KEY_GAME_SERVER .. "1", server_key_pattern()))
-assert(not string.match(KEY_GAME_SERVER .. "a1", server_key_pattern()))
-assert(not string.match(KEY_GAME_SERVER .. "1a", server_key_pattern()))
-assert(not string.match(KEY_GAME_SERVER .. ",", server_key_pattern()))
-assert(not string.match(KEY_GAME_SERVER .. "1_1", server_key_pattern()))
-assert(not string.match(KEY_GAME_SERVER .. "a_1", server_key_pattern()))
-assert(not string.match(KEY_GAME_SERVER .. "1a_10", server_key_pattern()))
-assert(not string.match(KEY_GAME_SERVER .. "1_1p", server_key_pattern()))
-assert(not string.match(KEY_GAME_SERVER .. "p1_1", server_key_pattern()))
-assert(not string.match("H" .. KEY_GAME_SERVER .. "1_1", server_key_pattern()))
+assert(    string.match(KEY_GAME_SERVER .. "1", server_key_pattern(1)))
+assert(not string.match(KEY_GAME_SERVER .. "a1", server_key_pattern(1)))
+assert(not string.match(KEY_GAME_SERVER .. "1a", server_key_pattern(1)))
+assert(not string.match(KEY_GAME_SERVER .. ",", server_key_pattern(1)))
+assert(not string.match(KEY_GAME_SERVER .. "1_1", server_key_pattern(1)))
+assert(not string.match(KEY_GAME_SERVER .. "a_1", server_key_pattern(1)))
+assert(not string.match(KEY_GAME_SERVER .. "1a_10", server_key_pattern(1)))
+assert(not string.match(KEY_GAME_SERVER .. "1_1p", server_key_pattern(1)))
+assert(not string.match(KEY_GAME_SERVER .. "p1_1", server_key_pattern(1)))
+assert(not string.match("H" .. KEY_GAME_SERVER .. "1_1", server_key_pattern(1)))
 
+function get_server_key(db_client, server_id)
+    local server_key_list = fetch_pattern_key_list(db_client, server_key_pattern(server_id))
+    assert(#server_key_list == 1)
+    return server_key_list[1]
+end
 
 function merge_player_data(source_client, destination_client)
     local player_key_list = fetch_pattern_key_list(source_client, player_key_pattern())
@@ -90,27 +103,29 @@ function merge_player_data(source_client, destination_client)
     end
 end
 
--- function merge_server_data(source_client_a, source_client_b, destination_client)
---     local a_server_key = fetch_pattern_key_list(source_client_a, server_key_pattern())
+function merge_server_data(source_client_a, source_client_b, destination_client)
+    local a_server_key = get_server_key(source_client_a, db_conf.source_client_a.server_id)
+    local b_server_key = get_server_key(source_client_b, db_conf.source_client_b.server_id)
+    local c_server_key = get_server_key(destination_client, db_conf.destination_db.server_id)
 
---     for _, hash_name in pairs(server_key_list) do
+    local sub_system_key_list = union_list(
+        source_client_a:hkeys(a_server_key),
+        source_client_b:hkeys(b_server_key)
+    )
 
---         local sub_system_key_list = source_client_a:hkeys(hash_name)
+    for _, sub_system_key in pairs(sub_system_key_list) do
+        local handler = merge_server_data_handler[sub_system_key]
 
---         for _, sub_system_key in pairs(sub_system_key_list) do
---             local handler = merge_server_data_handler[sub_system_key]
+        if handler then
+            local a_data_string = source_client_a:hget(a_server_key, sub_system_key)
+            local b_data_string = source_client_b:hget(b_server_key, sub_system_key)
 
---             if handler then
---                 local a_data_string = source_client_a:hget(hash_name, sub_system_key)
---                 local b_data_string = source_client_b:hget(hash_name, sub_system_key)
+            local c_data_string = seri.pack(handler(seri.unpack(a_data_string), seri.unpack(b_data_string)))
+            destination_client:hset(c_server_key, sub_system_key, c_data_string)
+        end
+    end
 
---                 local c_data_string = seri.pack(handler(seri.unpack(a_data_string), seri.unpack(b_data_string)))
---                 destination_client:hset(hash_name, sub_system_key, c_data_string)
---             end
---         end
-
---     end
--- end
+end
 
 function main()
     local source_a = connect_db(db_conf.source_db_a)
@@ -120,7 +135,7 @@ function main()
     merge_player_data(source_a, destination_c)
     merge_player_data(source_b, destination_c)
 
-    -- merge_server_data(source_a, source_b, destination_c)
+    merge_server_data(source_a, source_b, destination_c)
 end
 
 main()
