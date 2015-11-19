@@ -1,5 +1,6 @@
 local redis                     = require "redis"
 local seri                      = require "seri"
+local util                      = require "util"
 local db_conf                   = require "db_conf"
 local merge_player_data_handler = require "merge_player_data_handler"
 local merge_server_data_handler = require "merge_server_data_handler"
@@ -30,25 +31,6 @@ function fetch_pattern_key_list(db_client, pattern)
     end
 
     return key_list
-end
-
-function aux_union_list(list, aux_list, ret_list)
-    for _, v in pairs(list) do
-        if not aux_list[v] then
-            aux_list[v] = true
-            table.insert(ret_list, v)
-        end
-    end
-end
-
-function union_list(list_x, list_y)
-    local aux_list = {}
-    local ret_list = {}
-
-    aux_union_list(list_x, aux_list, ret_list)
-    aux_union_list(list_y, aux_list, ret_list)
-
-    return ret_list
 end
 
 function player_key_pattern()
@@ -126,7 +108,7 @@ function merge_server_data(source_client_a, source_client_b, destination_client)
 
     destination_client:del(c_server_key)
 
-    local sub_system_key_list = union_list(
+    local sub_system_key_list = util.union_list(
         a_server_key and source_client_a:hkeys(a_server_key) or {},
         b_server_key and source_client_b:hkeys(b_server_key) or {}
     )
